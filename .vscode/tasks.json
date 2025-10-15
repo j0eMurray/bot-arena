@@ -1,0 +1,98 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Dev: Docker up (db+api+ingest)",
+      "type": "shell",
+      "command": "docker compose -f infra/docker-compose.dev.yml up -d --build",
+      "problemMatcher": []
+    },
+    {
+      "label": "Dev: Docker down",
+      "type": "shell",
+      "command": "docker compose -f infra/docker-compose.dev.yml down -v",
+      "problemMatcher": []
+    },
+    {
+      "label": "Platform: pnpm install",
+      "type": "shell",
+      "options": {
+        "cwd": "${workspaceFolder}/platform"
+      },
+      "command": "corepack enable && pnpm install",
+      "problemMatcher": []
+    },
+    {
+      "label": "Platform: lint",
+      "type": "shell",
+      "options": {
+        "cwd": "${workspaceFolder}/platform"
+      },
+      "command": "pnpm lint",
+      "problemMatcher": []
+    },
+    {
+      "label": "Platform: typecheck",
+      "type": "shell",
+      "options": {
+        "cwd": "${workspaceFolder}/platform"
+      },
+      "command": "pnpm typecheck",
+      "problemMatcher": []
+    },
+    {
+      "label": "Platform: format",
+      "type": "shell",
+      "options": {
+        "cwd": "${workspaceFolder}/platform"
+      },
+      "command": "pnpm fmt",
+      "problemMatcher": []
+    },
+    {
+      "label": "App: flutter pub get",
+      "type": "shell",
+      "options": {
+        "cwd": "${workspaceFolder}/app"
+      },
+      "command": "flutter pub get",
+      "problemMatcher": []
+    },
+    {
+      "label": "App: run (web-server from .env)",
+      "type": "shell",
+      "options": {
+        "cwd": "${workspaceFolder}/app"
+      },
+      "command": "powershell -ExecutionPolicy Bypass -File ../scripts/windows/app-run-web-from-env.ps1",
+      "problemMatcher": []
+    },
+    {
+      "label": "Device: build",
+      "type": "shell",
+      "options": {
+        "cwd": "${workspaceFolder}/device"
+      },
+      "command": "pio run",
+      "problemMatcher": []
+    },
+    {
+      "label": "Device: upload (serial)",
+      "type": "shell",
+      "options": {
+        "cwd": "${workspaceFolder}/device"
+      },
+      "command": "pio run -t upload",
+      "problemMatcher": []
+    },
+    {
+      "label": "Device: monitor",
+      "type": "shell",
+      "options": {
+        "cwd": "${workspaceFolder}/device"
+      },
+      "command": "pio device monitor",
+      "problemMatcher": []
+    }
+  ]
+}

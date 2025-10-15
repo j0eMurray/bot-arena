@@ -1,0 +1,41 @@
+{
+  "folders": [
+    {
+      "path": "."
+    },
+    {
+      "path": "platform"
+    },
+    {
+      "path": "app"
+    },
+    {
+      "path": "device"
+    }
+  ],
+  "settings": {
+    "files.exclude": {
+      "**/.git": true,
+      "**/.DS_Store": true,
+      "**/node_modules": true,
+      "**/.dart_tool": true,
+      "**/.pio": true,
+      "**/build": true
+    },
+    "editor.formatOnSave": true,
+    "editor.defaultFormatter": "esbenp.prettier-vscode"
+  },
+  "extensions": {
+    "recommendations": [
+      "ms-azuretools.vscode-docker",
+      "ms-vscode-remote.remote-wsl",
+      "ms-vscode-remote.remote-containers",
+      "dbaeumer.vscode-eslint",
+      "esbenp.prettier-vscode",
+      "GitHub.copilot",
+      "eamodio.gitlens",
+      "dart-code.flutter",
+      "platformio.platformio-ide"
+    ]
+  }
+}

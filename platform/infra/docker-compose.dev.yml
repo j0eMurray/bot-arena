@@ -1,0 +1,101 @@
+services:
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_USER: postgres
+      POSTGRES_DB: iot
+    ports:
+      - "5432:5432"
+    volumes:
+      - db-data:/var/lib/postgresql/data
+      - ./db/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d iot"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  #mosquitto:
+  #  image: eclipse-mosquitto:2
+  #  volumes:
+  #    - ./mosquitto/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+  #    - ./mosquitto/passwords:/mosquitto/config/passwords:ro
+  #    - mosq-data:/mosquitto/data
+  #  ports:
+  #    - "1883:1883"
+    #healthcheck:
+    #  test: ["CMD-SHELL", "mosquitto -c /mosquitto/config/mosquitto.conf -p 0 -v >/dev/null 2>&1 || exit 1"]
+    #  interval: 10s
+    #  timeout: 3s
+    #  retries: 10
+
+  # Contenedor de desarrollo para EDITAR el repo con VS Code (no expone puertos)
+  dev:
+    image: mcr.microsoft.com/devcontainers/javascript-node:20
+    volumes:
+      - ..:/workspace:cached
+    working_dir: /workspace
+    command: sleep infinity
+    environment:
+      # Variables útiles dentro del devcontainer por si ejecutas scripts
+      PG_URL: postgres://postgres:postgres@db:5432/iot
+      MQTT_URL: mqtt://mosquitto:1883
+
+  # Servicio API Fastify expuesto a la LAN en 0.0.0.0:3000
+  api:
+    image: node:20-alpine
+    working_dir: /workspace/services/api
+    command: ["sh","-lc","corepack enable && cd /workspace && pnpm install && cd services/api && pnpm dev"]
+    ports:
+      - "127.0.0.1:3000:3000"   # 👈 expone la API hacia el host / LAN
+    volumes:
+      - ..:/workspace
+    environment:
+      NODE_ENV: development
+      PG_URL: postgres://postgres:postgres@db:5432/iot
+      # Postgres (usa el DB 'iot' que definiste arriba)
+      DATABASE_URL: postgres://postgres:postgres@db:5432/iot
+      PGHOST: db
+      PGPORT: "5432"
+      PGUSER: postgres
+      PGPASSWORD: postgres
+      PGDATABASE: iot
+      # MQTT (con auth del usuario iot_ingest que creaste)
+      MQTT_URL: mqtt://iot_ingest:changeme@host.docker.internal:1883
+      # Forzar bind 0.0.0.0 si tu código lee esto
+      FASTIFY_ADDRESS: 0.0.0.0
+    depends_on:
+      db:
+        condition: service_healthy
+      #mosquitto:
+        #condition: service_healthy
+        #condition: service_started
+
+  # Servicio de ingesta (MQTT -> Postgres)
+  ingest:
+    image: node:20-alpine
+    working_dir: /workspace/services/ingest
+    command: ["sh","-lc","corepack enable && cd /workspace && pnpm install && cd services/ingest && pnpm dev"]
+    volumes:
+      - ..:/workspace
+    environment:
+      NODE_ENV: development
+      PG_URL: postgres://postgres:postgres@db:5432/iot
+      DATABASE_URL: postgres://postgres:postgres@db:5432/iot
+      PGHOST: db
+      PGPORT: "5432"
+      PGUSER: postgres
+      PGPASSWORD: postgres
+      PGDATABASE: iot
+      MQTT_URL: mqtt://iot_ingest:changeme@host.docker.internal:1883
+    depends_on:
+      db:
+        condition: service_healthy
+      #mosquitto:
+        #condition: service_healthy
+        #condition: service_started
+
+volumes:
+  db-data:
+  mosq-data:

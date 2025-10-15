@@ -1,0 +1,42 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "type": "node",
+      "request": "attach",
+      "name": "Attach: API (container)",
+      "address": "localhost",
+      "port": 9229,
+      "restart": true,
+      "protocol": "inspector",
+      "localRoot": "${workspaceFolder}/platform/services/api",
+      "remoteRoot": "/workspace/platform/services/api",
+      "skipFiles": [
+        "<node_internals>/**"
+      ]
+    },
+    {
+      "type": "node",
+      "request": "attach",
+      "name": "Attach: Ingest (container)",
+      "address": "localhost",
+      "port": 9230,
+      "restart": true,
+      "protocol": "inspector",
+      "localRoot": "${workspaceFolder}/platform/services/ingest",
+      "remoteRoot": "/workspace/platform/services/ingest",
+      "skipFiles": [
+        "<node_internals>/**"
+      ]
+    }
+  ],
+  "compounds": [
+    {
+      "name": "Dev: Docker up + Attach API",
+      "configurations": [
+        "Attach: API (container)"
+      ],
+      "preLaunchTask": "Dev: Docker up (db+api+ingest)"
+    }
+  ]
+}

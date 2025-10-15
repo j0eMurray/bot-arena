@@ -1,0 +1,43 @@
+# Node / TS / pnpm
+node_modules/
+dist/
+build/
+pnpm-lock.yaml
+
+# Env
+.env
+.env.*
+!.env.sample
+
+# VS Code / Dev Containers
+.vscode/
+.devcontainer/local-history/
+*.code-workspace
+
+# Docker
+docker-compose*.local.yml
+infra/mosquitto/passwords
+infra/*/data
+infra/*/tmp
+
+# Flutter (futuro)
+apps/flutter_app/build/
+apps/flutter_app/.dart_tool/
+apps/flutter_app/.flutter-plugins
+apps/flutter_app/.flutter-plugins-dependencies
+apps/flutter_app/ios/Pods/
+apps/flutter_app/pubspec.lock
+
+# OS
+.DS_Store
+Thumbs.db
+
+# pnpm store (cache)
+.pnpm-store/
+.pnpm_store/
+
+# Mosquitto logs
+infra/mosquitto/log/
+
+# Continue agents (local only)
+.devcontainer/continue/

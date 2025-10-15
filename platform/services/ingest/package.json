@@ -1,0 +1,13 @@
+{
+  "name": "@svc/ingest",
+  "private": true,
+  "type": "module",
+  "scripts": { "dev": "tsx watch src/index.ts" },
+  "dependencies": {
+    "mqtt": "^5.7.0",
+    "pg": "^8.12.0",
+    "zod": "^3.23.8",
+    "pino": "^9.3.2"
+  },
+  "devDependencies": { "tsx": "^4.19.1", "typescript": "^5.6.2" }
+}
