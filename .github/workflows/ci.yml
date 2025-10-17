@@ -16,6 +16,13 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      # Crea un .env.dev vacío SOLO para CI (evita error de env_file faltante)
+      - name: Prepare env file for compose
+        run: |
+          mkdir -p infra
+          echo "# CI placeholder" > infra/.env.dev
+
       - name: Compose config (infra/docker-compose.dev.yml)
         run: docker compose -f infra/docker-compose.dev.yml config
 
@@ -79,4 +86,3 @@ jobs:
 
       - name: Analyze
         run: flutter analyze --no-fatal-infos --no-fatal-warnings
-        # Si deseas que warnings fallen el build, quita los flags.
