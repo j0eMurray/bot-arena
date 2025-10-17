@@ -1,0 +1,82 @@
+name: CI
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  compose-validate:
+    name: Docker Compose validate
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Compose config (infra/docker-compose.dev.yml)
+        run: docker compose -f infra/docker-compose.dev.yml config
+
+  node-platform:
+    name: Platform (TypeScript lint + typecheck)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: platform
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Enable corepack & pnpm@9
+        run: |
+          corepack enable
+          corepack prepare pnpm@9 --activate
+
+      - name: Cache pnpm store
+        uses: actions/cache@v4
+        with:
+          path: ~/.local/share/pnpm/store
+          key: pnpm-${{ runner.os }}-${{ hashFiles('platform/pnpm-lock.yaml', 'platform/package.json') }}
+          restore-keys: |
+            pnpm-${{ runner.os }}-
+
+      - name: Install deps (workspace)
+        run: pnpm install --frozen-lockfile=false
+
+      - name: TypeScript typecheck
+        run: pnpm exec tsc -p tsconfig.json --noEmit
+
+      - name: ESLint (max-warnings=0)
+        run: pnpm exec eslint . --ext .ts,.tsx --max-warnings=0
+
+  flutter-app:
+    name: Flutter analyze (app/)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: app
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: "stable"
+
+      - name: Flutter version
+        run: flutter --version
+
+      - name: Pub get
+        run: flutter pub get
+
+      - name: Analyze
+        run: flutter analyze --no-fatal-infos --no-fatal-warnings
+        # Si deseas que warnings fallen el build, quita los flags.
