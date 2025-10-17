@@ -1,0 +1,9 @@
+:5274 {
+  encode zstd gzip
+
+  @ws path /ws
+  reverse_proxy @ws 127.0.0.1:3000
+
+  # Resto de rutas (incluye /health) a la API
+  reverse_proxy 127.0.0.1:3000
+}

@@ -1,0 +1,84 @@
+#version: "3.9"
+
+services:
+  db:
+    image: postgres:16
+    container_name: botarena_db
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: iot
+    volumes:
+      - db_data:/var/lib/postgresql/data
+      - ../platform/infra/db/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d iot"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  api:
+    image: node:20-bookworm-slim
+    container_name: botarena_api
+    working_dir: /workspace/platform
+    volumes:
+      - ..:/workspace:cached
+    env_file:
+      - ./.env.dev
+    environment:
+      FASTIFY_ADDRESS: 0.0.0.0
+      PORT: 3000
+      DATABASE_URL: postgres://postgres:postgres@db:5432/iot
+      PG_URL:        postgres://postgres:postgres@db:5432/iot
+      PGHOST:        db
+      PGPORT:        5432
+      PGUSER:        postgres
+      PGPASSWORD:    postgres
+      PGDATABASE:    iot
+      MQTT_URL: mqtt://iot_ingest:changeme@host.docker.internal:1883
+    depends_on:
+      db:
+        condition: service_healthy
+    command: >
+      sh -lc "corepack enable &&
+              pnpm install &&
+              pnpm --filter @svc/api dev"
+    ports:
+      # Publicamos 3000 al host; Caddy en Windows escucha 5274 y proxyea a http://127.0.0.1:3000
+      - "3000:3000"
+      # - "9229:9229"  # (opcional) debug
+
+  ingest:
+    image: node:20-bookworm-slim
+    container_name: botarena_ingest
+    working_dir: /workspace/platform
+    volumes:
+      - ..:/workspace:cached
+    env_file:
+      - ./.env.dev
+    environment:
+      DATABASE_URL: postgres://postgres:postgres@db:5432/iot
+      PG_URL:        postgres://postgres:postgres@db:5432/iot
+      PGHOST:        db
+      PGPORT:        5432
+      PGUSER:        postgres
+      PGPASSWORD:    postgres
+      PGDATABASE:    iot
+      MQTT_URL: mqtt://iot_ingest:changeme@host.docker.internal:1883
+      LOG_LEVEL: debug
+    depends_on:
+      db:
+        condition: service_healthy
+    command: >
+      sh -lc "corepack enable &&
+              pnpm install &&
+              NODE_OPTIONS='--inspect=0.0.0.0:9230' pnpm --filter @svc/ingest dev"
+    ports:
+      - "9230:9230"
+
+volumes:
+  db_data:
+    name: botarena_pgdata
+    external: false

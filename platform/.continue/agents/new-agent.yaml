@@ -1,0 +1,19 @@
+name: GPT-4.1 Mini (OpenAI)
+version: 1.0.0
+schema: v1
+
+models:
+  - name: openai-4.1-mini
+    provider: openai
+    model: gpt-4.1-mini
+    # Toma la API key de la variable de entorno del contenedor
+    apiKey: ${{ env.OPENAI_API_KEY }}
+
+# Si luego tienes acceso a 4.1 "full", añade una entrada extra:
+#  - name: openai-4.1
+#    provider: openai
+#    model: gpt-4.1
+#    apiKey: ${env:OPENAI_API_KEY}
+
+# Puedes borrar esta sección si no usas MCP
+mcpServers: []

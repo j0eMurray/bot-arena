@@ -1,0 +1,35 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Docker: up",
+      "type": "shell",
+      "command": ".\\scripts\\windows\\docker-up.ps1",
+      "problemMatcher": []
+    },
+    {
+      "label": "Docker: down",
+      "type": "shell",
+      "command": ".\\scripts\\windows\\docker-down.ps1",
+      "problemMatcher": []
+    },
+    {
+      "label": "Caddy: start",
+      "type": "shell",
+      "command": ".\\scripts\\windows\\caddy-start.ps1",
+      "problemMatcher": []
+    },
+    {
+      "label": "Mosquitto: start",
+      "type": "shell",
+      "command": ".\\scripts\\windows\\mosquitto-start.ps1",
+      "problemMatcher": []
+    },
+    {
+      "label": "Web: dev server (Flutter web-server)",
+      "type": "shell",
+      "command": ".\\scripts\\windows\\web-server-up.ps1",
+      "problemMatcher": []
+    }
+  ]
+}

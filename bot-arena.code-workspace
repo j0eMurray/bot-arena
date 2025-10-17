@@ -1,0 +1,77 @@
+{
+  "folders": [
+    { "path": "." },
+    { "path": "platform" },
+    { "path": "app" },
+    { "path": "device" },
+    { "path": "infra" },
+    { "path": "scripts" }
+  ],
+  "settings": {
+    // -------------------------
+    // Editor & TypeScript
+    // -------------------------
+    "editor.formatOnSave": true,
+    "editor.defaultFormatter": "esbenp.prettier-vscode",
+    "files.eol": "\n",
+    "files.trimTrailingWhitespace": true,
+    "files.insertFinalNewline": true,
+
+    "typescript.tsdk": "platform/services/api/node_modules/typescript/lib",
+    "typescript.preferences.importModuleSpecifier": "non-relative",
+    "typescript.updateImportsOnFileMove.enabled": "always",
+    "typescript.preferences.quoteStyle": "single",
+    "prettier.singleQuote": true,
+    "prettier.trailingComma": "all",
+
+    // -------------------------
+    // Copilot (actívalo de inmediato)
+    // -------------------------
+    "github.copilot.enable": {
+      "*": true,
+      "plaintext": false,
+      "markdown": true,
+      "scminput": false
+    },
+    // Copilot Chat visible
+    "github.copilot.chat.editor.enable": true,
+
+    // -------------------------
+    // Dart / Flutter
+    // -------------------------
+    "dart.sdkPath": null,
+    "dart.flutterSdkPath": null,
+    "dart.previewFlutterUiGuides": true,
+    "dart.flutterHotReloadOnSave": "always",
+    "dart.lineLength": 100,
+
+    // -------------------------
+    // Docker / Dev Containers
+    // -------------------------
+    "docker.showStartPage": false,
+
+    // -------------------------
+    // Terminal
+    // -------------------------
+    "terminal.integrated.defaultProfile.windows": "PowerShell",
+    "terminal.integrated.profiles.windows": {
+      "PowerShell": {
+        "source": "PowerShell",
+        "icon": "terminal-powershell"
+      }
+    }
+  },
+  "extensions": {
+    "recommendations": [
+      "GitHub.copilot",
+      "GitHub.copilot-chat",
+      "dart-code.dart-code",
+      "dart-code.flutter",
+      "dbaeumer.vscode-eslint",
+      "esbenp.prettier-vscode",
+      "ms-azuretools.vscode-docker",
+      "ms-vscode-remote.remote-containers",
+      "ms-vscode.powershell"
+    ]
+  }
+}

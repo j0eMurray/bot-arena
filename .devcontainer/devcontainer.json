@@ -1,0 +1,37 @@
+{
+  "name": "Bot Arena (platform dev)",
+  "dockerComposeFile": [
+    "../infra/docker-compose.dev.yml"
+  ],
+  "service": "api",
+  "workspaceFolder": "/workspace",
+  "containerEnv": {
+    "COREPACK_ENABLE_DOWNLOAD_PROMPT": "0",
+    "npm_config_yes": "true"
+  },
+  "postCreateCommand": "bash -lc 'apt-get update && apt-get install -y curl jq && cd /workspace/platform && corepack enable && corepack prepare pnpm@latest --activate && pnpm install || npm install'",
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-azuretools.vscode-docker",
+        "dbaeumer.vscode-eslint",
+        "esbenp.prettier-vscode",
+        "GitHub.copilot"
+      ],
+      "settings": {
+        "editor.formatOnSave": true
+      }
+    }
+  },
+  "mounts": [
+    "source=${localWorkspaceFolder},target=/workspace,type=bind,consistency=delegated"
+  ],
+  "forwardPorts": [
+    3000,
+    9229,
+    9230
+  ],
+  "appPort": [
+    3000
+  ]
+}
