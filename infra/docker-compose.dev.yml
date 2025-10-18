@@ -41,11 +41,14 @@ services:
     depends_on:
       db:
         condition: service_healthy
-    command: sh -lc "corepack enable && pnpm install && pnpm --filter @svc/api dev"
+    command: >
+      sh -lc "corepack enable &&
+              pnpm install &&
+              pnpm --filter @svc/api dev"
     ports:
-      # Importante: exponemos SOLO en loopback del host (no visible en la LAN)
-      - "5274:3000"
-      # - "9229:9229" # (opcional) debug
+      # Publicamos 3000 al host; Caddy en Windows escucha 5274 y proxyea a http://127.0.0.1:3000
+      - "3000:3000"
+      # - "9229:9229"  # (opcional) debug
 
   ingest:
     image: node:20-bookworm-slim
@@ -68,7 +71,10 @@ services:
     depends_on:
       db:
         condition: service_healthy
-    command: sh -lc "corepack enable && pnpm install && NODE_OPTIONS='--inspect=0.0.0.0:9230' pnpm --filter @svc/ingest dev"
+    command: >
+      sh -lc "corepack enable &&
+              pnpm install &&
+              NODE_OPTIONS='--inspect=0.0.0.0:9230' pnpm --filter @svc/ingest dev"
     ports:
       - "9230:9230"
 

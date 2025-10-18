@@ -1,0 +1,48 @@
+{
+  // ===== Editor / Formato =====
+  "editor.formatOnSave": true,
+  "editor.defaultFormatter": "esbenp.prettier-vscode",
+  "files.trimTrailingWhitespace": true,
+  "files.insertFinalNewline": true,
+
+  // ===== TypeScript / Prettier =====
+  "typescript.tsdk": "platform/services/api/node_modules/typescript/lib",
+  "typescript.updateImportsOnFileMove.enabled": "always",
+  "typescript.preferences.importModuleSpecifier": "non-relative",
+  "typescript.preferences.quoteStyle": "single",
+  "prettier.singleQuote": true,
+  "prettier.trailingComma": "all",
+
+  // ===== Inline suggestions =====
+  // Dejamos habilitado inline general; Copilot provee la mayoría.
+  "editor.inlineSuggest.enabled": true,
+
+  // ===== Copilot =====
+  "github.copilot.enable": {
+    "*": true,
+    "plaintext": false,
+    "markdown": true,
+    "scminput": false
+  },
+  "github.copilot.chat.editor.enable": true,
+
+  // ===== Codex (OpenAI’s coding agent) =====
+  // Nota: el nombre de configuración puede variar por versión de la extensión.
+  // Idea: evitar doble “ghost text” → usa Codex por chat/comandos, no inline.
+  // Si ves doble sugerencia, busca en Settings "Codex inline" y desactívala.
+  // (Coloco flags “opcionales” por si la extensión los expone)
+  "codex.inlineCompletions.enabled": false,
+  "codex.suggestions.enabled": true,
+  "codex.telemetry.enabled": false,
+
+  // ===== Dart / Flutter =====
+  "dart.previewFlutterUiGuides": true,
+  "dart.flutterHotReloadOnSave": "always",
+  "dart.lineLength": 100,
+
+  // ===== Docker =====
+  "docker.showStartPage": false,
+
+  // ===== Terminal =====
+  "terminal.integrated.defaultProfile.windows": "PowerShell"
+}

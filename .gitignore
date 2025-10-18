@@ -44,3 +44,8 @@ infra/**/volumes/
 
 # Misc
 *.local
+
+# Local duplicate backups
+_dupe_backup/
+# Zip bundles
+*.zip

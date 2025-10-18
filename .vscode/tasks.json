@@ -2,96 +2,33 @@
   "version": "2.0.0",
   "tasks": [
     {
-      "label": "Dev: Docker up (db+api+ingest)",
+      "label": "Docker: up",
       "type": "shell",
-      "command": "docker compose -f infra/docker-compose.dev.yml up -d --build",
+      "command": ".\\scripts\\windows\\docker-up.ps1",
       "problemMatcher": []
     },
     {
-      "label": "Dev: Docker down",
+      "label": "Docker: down",
       "type": "shell",
-      "command": "docker compose -f infra/docker-compose.dev.yml down -v",
+      "command": ".\\scripts\\windows\\docker-down.ps1",
       "problemMatcher": []
     },
     {
-      "label": "Platform: pnpm install",
+      "label": "Caddy: start",
       "type": "shell",
-      "options": {
-        "cwd": "${workspaceFolder}/platform"
-      },
-      "command": "corepack enable && pnpm install",
+      "command": ".\\scripts\\windows\\caddy-start.ps1",
       "problemMatcher": []
     },
     {
-      "label": "Platform: lint",
+      "label": "Mosquitto: start",
       "type": "shell",
-      "options": {
-        "cwd": "${workspaceFolder}/platform"
-      },
-      "command": "pnpm lint",
+      "command": ".\\scripts\\windows\\mosquitto-start.ps1",
       "problemMatcher": []
     },
     {
-      "label": "Platform: typecheck",
+      "label": "Web: dev server (Flutter web-server)",
       "type": "shell",
-      "options": {
-        "cwd": "${workspaceFolder}/platform"
-      },
-      "command": "pnpm typecheck",
-      "problemMatcher": []
-    },
-    {
-      "label": "Platform: format",
-      "type": "shell",
-      "options": {
-        "cwd": "${workspaceFolder}/platform"
-      },
-      "command": "pnpm fmt",
-      "problemMatcher": []
-    },
-    {
-      "label": "App: flutter pub get",
-      "type": "shell",
-      "options": {
-        "cwd": "${workspaceFolder}/app"
-      },
-      "command": "flutter pub get",
-      "problemMatcher": []
-    },
-    {
-      "label": "App: run (web-server from .env)",
-      "type": "shell",
-      "options": {
-        "cwd": "${workspaceFolder}/app"
-      },
-      "command": "powershell -ExecutionPolicy Bypass -File ../scripts/windows/app-run-web-from-env.ps1",
-      "problemMatcher": []
-    },
-    {
-      "label": "Device: build",
-      "type": "shell",
-      "options": {
-        "cwd": "${workspaceFolder}/device"
-      },
-      "command": "pio run",
-      "problemMatcher": []
-    },
-    {
-      "label": "Device: upload (serial)",
-      "type": "shell",
-      "options": {
-        "cwd": "${workspaceFolder}/device"
-      },
-      "command": "pio run -t upload",
-      "problemMatcher": []
-    },
-    {
-      "label": "Device: monitor",
-      "type": "shell",
-      "options": {
-        "cwd": "${workspaceFolder}/device"
-      },
-      "command": "pio device monitor",
+      "command": ".\\scripts\\windows\\web-server-up.ps1",
       "problemMatcher": []
     }
   ]
