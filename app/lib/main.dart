@@ -2,6 +2,7 @@
 import 'dart:async';
 import 'dart:convert';
 //import 'dart:html' as html;
+import 'web_compat_stub.dart' if (dart.library.html) 'web_compat.dart' as web;
 
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
@@ -49,7 +50,7 @@ class _MyHomePageState extends State<MyHomePage> {
   String? _healthError;
 
   WsState _wsState = WsState.idle;
-  html.WebSocket? _ws;
+  web.WebSocket? _ws;
   Timer? _healthTimer;
 
   @override
@@ -113,7 +114,7 @@ class _MyHomePageState extends State<MyHomePage> {
 
     final wsUrl = _wsUri('/ws').toString();
 
-    final ws = html.WebSocket(wsUrl);
+    final ws = web.WebSocket(wsUrl);
     ws.onOpen.listen((_) {
       setState(() => _wsState = WsState.open);
     });
