@@ -1,7 +1,6 @@
 // app/lib/telemetry_page.dart
 import 'dart:async';
 import 'dart:convert';
-import 'dart:ui'; // FontFeature
 
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
