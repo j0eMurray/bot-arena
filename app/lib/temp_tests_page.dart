@@ -9,7 +9,7 @@ import 'package:web_socket_channel/html.dart';  // Web
 import 'package:web_socket_channel/io.dart';    // Desktop/Mobile
 
 /// Temp-tests: pantalla temporal de pruebas.
-/// Recibe [apiHttp] y [apiWs] desde main.dart para no acoplarse a detalles de env aquí.
+/// Recibe [apiHttp] y [apiWs] desde main.dart.
 class TempTestsPage extends StatefulWidget {
   final String apiHttp;
   final String apiWs;
@@ -27,11 +27,20 @@ class TempTestsPage extends StatefulWidget {
 class _TempTestsPageState extends State<TempTestsPage> {
   String health = 'pending...';
   List<dynamic> wsData = [];
+  List<Map<String, dynamic>> recent = [];
   WebSocketChannel? _chan;
   Timer? _timer;
 
   String get _healthUrl => '${widget.apiHttp.replaceAll(RegExp(r'/$'), '')}/health';
   String get _wsUrl     => '${widget.apiWs.replaceAll(RegExp(r'/$'), '')}/ws';
+  String _telemetryUrl({int limit = 20, String? deviceId}) {
+    final base = '${widget.apiHttp.replaceAll(RegExp(r'/$'), '')}/telemetry';
+    final q = <String>[
+      'limit=$limit',
+      if (deviceId != null && deviceId.isNotEmpty) 'device_id=$deviceId',
+    ].join('&');
+    return '$base?$q';
+  }
 
   @override
   void initState() {
@@ -48,6 +57,22 @@ class _TempTestsPageState extends State<TempTestsPage> {
     } catch (e) {
       setState(() => health = 'error: $e');
     }
+  }
+
+  Future<void> _fetchRecent() async {
+    try {
+      final url = _telemetryUrl(limit: 20);
+      final res = await http.get(Uri.parse(url));
+      if (res.statusCode == 200) {
+        final body = jsonDecode(res.body);
+        if (body is Map && body['ok'] == true && body['data'] is List) {
+          final List data = body['data'];
+          setState(() {
+            recent = data.cast<Map<String, dynamic>>();
+          });
+        }
+      }
+    } catch (_) {}
   }
 
   void _connectWs() {
@@ -80,23 +105,29 @@ class _TempTestsPageState extends State<TempTestsPage> {
 
   @override
   Widget build(BuildContext context) {
-    final items = wsData.take(10).map((e) => Text(e.toString())).toList();
+    final wsItems = wsData.take(5).map((e) => Text(e.toString())).toList();
+    final recentItems = recent.map((row) {
+      final ts = row['ts'] ?? '';
+      final dev = row['device_id'] ?? '';
+      final payload = jsonEncode(row['payload']);
+      return Text('[$ts] $dev → $payload');
+    }).toList();
 
     return Scaffold(
       appBar: AppBar(title: const Text('Temp-tests')),
       body: Padding(
         padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+        child: ListView(
           children: [
             Text('API_HTTP: ${widget.apiHttp}'),
             Text('API_WS  : ${widget.apiWs}'),
             const SizedBox(height: 8),
             Text('Health → $health'),
             const Divider(),
-            const Text('WS sample (last up to 10 rows):'),
-            ...items,
-            const Spacer(),
+            const Text('WS sample (last up to 5 rows):'),
+            ...wsItems,
+            const SizedBox(height: 16),
+            const Divider(),
             Row(
               children: [
                 ElevatedButton(
@@ -105,11 +136,15 @@ class _TempTestsPageState extends State<TempTestsPage> {
                 ),
                 const SizedBox(width: 12),
                 ElevatedButton(
+                  onPressed: _fetchRecent,
+                  child: const Text('Fetch telemetry (20)'),
+                ),
+                const SizedBox(width: 12),
+                ElevatedButton(
                   onPressed: () {
-                    // Cambia al canal /ws-test por 10s
+                    // Cambia a /ws-test por 10s
                     _chan?.sink.close();
-                    wsData = [];
-                    setState(() {});
+                    setState(() => wsData = []);
                     final url = '${widget.apiWs.replaceAll(RegExp(r'/$'), '')}/ws-test';
                     _chan = kIsWeb
                         ? HtmlWebSocketChannel.connect(url)
@@ -126,6 +161,9 @@ class _TempTestsPageState extends State<TempTestsPage> {
                 ),
               ],
             ),
+            const SizedBox(height: 12),
+            const Text('Recent telemetry:'),
+            ...recentItems,
           ],
         ),
       ),

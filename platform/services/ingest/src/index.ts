@@ -1,116 +1,99 @@
-import mqtt from "mqtt";
+// platform/services/ingest/src/index.ts
+// Servicio "ingest": se conecta a MQTT y guarda mensajes en Postgres.
+
+import mqtt, { MqttClient } from "mqtt";
 import { Client } from "pg";
-import { z } from "zod";
-import pino from "pino";
 
-const log = pino({ name: "ingest", level: process.env.LOG_LEVEL || "info" });
+const {
+  DATABASE_URL = "postgres://postgres:postgres@db:5432/iot",
+  MQTT_URL = "mqtt://host.docker.internal:1883",
+  LOG_LEVEL = "info",
+} = process.env;
 
-const env = {
-  MQTT_URL: process.env.MQTT_URL || "mqtt://localhost:1883",
-  MQTT_USER: process.env.MQTT_USER || "iot_ingest",
-  MQTT_PASS: process.env.MQTT_PASS || "changeme",
-  PG_URL: process.env.PG_URL || "postgres://postgres:postgres@localhost:5432/iot",
-};
-
-const telemSchema = z
-  .object({
-    v: z.number().optional(),
-    ts: z.union([z.number(), z.string()]).optional(),
-  })
-  .passthrough();
-
-type Telemetry = z.infer<typeof telemSchema>;
-
-// ---------- PG bootstrap ----------
-const pg = new Client({ connectionString: env.PG_URL });
-await pg.connect();
-
-await pg.query(`
-  CREATE TABLE IF NOT EXISTS device (
-    id TEXT PRIMARY KEY,
-    secret TEXT,
-    name TEXT,
-    created_at TIMESTAMPTZ DEFAULT now(),
-    last_seen TIMESTAMPTZ
-  );
-  CREATE TABLE IF NOT EXISTS telemetry (
-    device_id TEXT NOT NULL,
-    ts TIMESTAMPTZ NOT NULL,
-    payload JSONB NOT NULL
-  );
-  CREATE INDEX IF NOT EXISTS telemetry_device_ts_idx ON telemetry(device_id, ts DESC);
-`);
-
-// Normaliza ts a Date (acepta number sec/ms o string ISO)
-function coerceTs(val: unknown): Date {
-  if (typeof val === "number" && Number.isFinite(val)) {
-    const ms = val >= 1e12 ? val : Math.round(val * 1000);
-    return new Date(ms);
-  }
-  if (typeof val === "string") {
-    const d = new Date(val);
-    if (!isNaN(d.valueOf())) return d;
-  }
-  return new Date();
+function log(...args: unknown[]) {
+  console.log("[ingest]", ...args);
 }
 
-// ---------- MQTT ----------
-const client = mqtt.connect(env.MQTT_URL, {
-  username: env.MQTT_USER,
-  password: env.MQTT_PASS,
-  clean: true,
-});
+const maskConn = (s: string): string => s.replace(/:\/\/.*@/, "://***:***@");
 
-client.on("connect", () => {
-  log.info("MQTT connected");
-  client.subscribe("devices/+/telemetry", { qos: 1 });
-});
+async function main(): Promise<void> {
+  log("starting ingest…");
+  log("DATABASE_URL:", maskConn(DATABASE_URL));
+  log("MQTT_URL:", maskConn(MQTT_URL));
 
-client.on("message", async (topic, buf) => {
-  // DEBUG duro para ver qué llega
-  const rawStr = buf.toString("utf8");
-  log.debug({ topic, raw: rawStr }, "mqtt message received");
+  // Postgres
+  const pg = new Client({ connectionString: DATABASE_URL });
+  await pg.connect();
+  log("pg connected");
 
-  try {
-    const m = topic.match(/^devices\/([^/]+)\/telemetry$/);
-    if (!m) {
-      log.debug({ topic }, "topic skipped");
-      return;
-    }
-    const deviceId = m[1];
+  // MQTT
+  const client: MqttClient = mqtt.connect(MQTT_URL, {
+    reconnectPeriod: 2000,
+    protocolVersion: 4,
+    connectTimeout: 10_000,
+  });
 
-    const s = rawStr.trim();
-    let rawUnknown: unknown;
+  client.on("connect", () => {
+    log("mqtt connected");
+    const topic = "botarena/dev/+/up";
+    client.subscribe(topic, { qos: 0 }, (err: Error | null, granted?: mqtt.ISubscriptionGrant[]) => {
+      if (err) { console.error("subscribe error:", err.message); return; }
+      log("subscribed:", granted?.map(g => `${g.topic}@${g.qos}`).join(", ") ?? topic);
+    });
+  });
 
+  client.on("reconnect", () => log("mqtt reconnecting…"));
+  client.on("error", (err) => {
+    console.error("mqtt error:", err?.message ?? String(err));
+  });
+  client.on("close", () => log("mqtt connection closed"));
+
+  client.on("message", async (topic: string, message: Buffer) => {
     try {
-      rawUnknown = JSON.parse(s) as unknown;
-    } catch (e) {
-      log.warn({ topic, raw: s, err: (e as Error).message }, "discarding non-JSON payload");
-      return;
+      // topic: botarena/dev/<device_id>/up
+      const parts = topic.split("/");
+      const deviceId = parts.length >= 4 ? parts[2] : "unknown";
+
+      // payload: JSON o raw string si no es JSON válido
+      const raw = message.toString("utf-8");
+      let payload: unknown;
+      try {
+        payload = JSON.parse(raw) as unknown;
+      } catch {
+        payload = { raw };
+      }
+
+      await pg.query(
+        `INSERT INTO telemetry (device_id, topic, payload)
+         VALUES ($1, $2, $3)`,
+        [deviceId, topic, payload]
+      );
+
+      if (LOG_LEVEL === "debug") {
+        log("stored", { deviceId, topic, payload });
+      }
+    } catch (e: unknown) {
+      const err = e instanceof Error ? e.message : String(e);
+      console.error("ingest store error:", err);
     }
+  });
 
-    const parsed = telemSchema.safeParse(rawUnknown);
-    if (!parsed.success) {
-      log.warn({ topic, raw: s, err: parsed.error.flatten() }, "invalid payload");
-      return;
+  // shutdown limpio
+  const shutdown = async (): Promise<void> => {
+    try {
+      client.end(true);
+      await pg.end();
+    } finally {
+      process.exit(0);
     }
+  };
 
-    const data: Telemetry = parsed.data;
-    const ts = coerceTs(data.ts);
+  process.on("SIGINT", shutdown);
+  process.on("SIGTERM", shutdown);
+}
 
-    await pg.query(
-      `INSERT INTO device(id, last_seen) VALUES ($1, now())
-       ON CONFLICT (id) DO UPDATE SET last_seen = EXCLUDED.last_seen`,
-      [deviceId]
-    );
-
-    await pg.query(
-      "INSERT INTO telemetry(device_id, ts, payload) VALUES ($1, $2, $3)",
-      [deviceId, ts, data]
-    );
-
-    log.info({ deviceId }, "telemetry stored");
-  } catch (e) {
-    log.error({ err: e }, "ingest error");
-  }
+main().catch((e: unknown) => {
+  const err = e instanceof Error ? e.message : String(e);
+  console.error("fatal ingest error:", err);
+  process.exit(1);
 });

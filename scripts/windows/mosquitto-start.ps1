@@ -44,7 +44,7 @@ if ($LASTEXITCODE -ne 0 -or -not (Test-Path $passwdPath -PathType Leaf)) {
 
 $confPath = Join-Path $ConfDir 'mosquitto.conf'
 @"
-listener 1883 localhost
+listener 1883 0.0.0.0
 allow_anonymous false
 password_file $passwdPath
 persistence true

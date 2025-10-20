@@ -1,9 +1,11 @@
 :5274 {
-  encode zstd gzip
+  # OPTION: habilitar compresi??n (version anterior):
+  # encode zstd gzip
 
-  @ws path /ws
-  reverse_proxy @ws 127.0.0.1:3000
+  # OPTION: matcher expl??cito para WS (version anterior):
+  # @ws path /ws
+  # reverse_proxy @ws 127.0.0.1:3000
 
-  # Resto de rutas (incluye /health) a la API
+  # Proxy todo (incluye /health y rutas WS)
   reverse_proxy 127.0.0.1:3000
 }
