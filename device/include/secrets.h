@@ -1,11 +1,13 @@
+// device/include/secrets.h
 #pragma once
 
-// Ajusta estos valores:
-static const char* WIFI_SSID       = "Casa Lladser";
-static const char* WIFI_PASS       = "g8rpRgmhmsjm";
-static const char* DEVICE_ID       = "iot-device-v1";  // Identificador único del dispositivo
-static const char* MQTT_HOST       = "192.168.1.146";
-static const int   MQTT_PORT_CONST = MQTT_PORT;   // viene de build_flags (1883)
-static const char* MQTT_USER       = "iot_ingest";
-static const char* MQTT_PASS       = "changeme";
-static const char* MQTT_BASE_TOPIC = "devices";
+// --- WiFi ---
+#define WIFI_SSID "Casa Lladser"
+#define WIFI_PASS "g8rpRgmhmsjm"
+
+// --- MQTT (coincidir con Mosquitto) ---
+#define MQTT_HOST "192.168.1.146"
+#define MQTT_PORT 1883
+#define DEVICE_ID "esp32-dev-01"
+#define MQTT_USER "iot_ingest"
+#define MQTT_PASS "changeme"

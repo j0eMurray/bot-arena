@@ -17,16 +17,20 @@ if (-not (Test-Path $CaddyExe)) {
   exit 1
 }
 
-# --- Caddyfile ---
-# Proxy explícito del WS /ws a la API, y todo lo demás a la API también
+# --- Caddyfile (mínimo, WS incluido) ---
+# Generación minimalista: proxy todo (incluye /health, /ws y /ws-test) a la API.
+# Si en el futuro quieres activar compresión o un matcher explícito para /ws,
+# descomenta las líneas marcadas abajo ("OPTION: ...").
 $cfg = @"
 :$ListenPort {
-  encode zstd gzip
+  # OPTION: habilitar compresión (version anterior):
+  # encode zstd gzip
 
-  @ws path /ws
-  reverse_proxy @ws 127.0.0.1:$ApiPort
+  # OPTION: matcher explícito para WS (version anterior):
+  # @ws path /ws
+  # reverse_proxy @ws 127.0.0.1:$ApiPort
 
-  # Resto de rutas (incluye /health) a la API
+  # Proxy todo (incluye /health y rutas WS)
   reverse_proxy 127.0.0.1:$ApiPort
 }
 "@

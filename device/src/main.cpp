@@ -1,137 +1,107 @@
 #include <Arduino.h>
 #include <WiFi.h>
-#include <WiFiClient.h>
 #include <PubSubClient.h>
 #include <ArduinoJson.h>
-#include <NTPClient.h>
-#include <WiFiUdp.h>
+
 #include "secrets.h"
 
-// ====== Globals ======
-WiFiClient espClient;
-PubSubClient mqtt(espClient);
-WiFiUDP ntpUDP;
-NTPClient timeClient(ntpUDP, "pool.ntp.org", 0 /*UTC*/, 60000 /*ms*/);
+WiFiClient wifi;
+PubSubClient mqtt(wifi);
 
-// Tópicos
-String topicTelemetry = String(MQTT_BASE_TOPIC) + "/" + DEVICE_ID + "/telemetry";
-String topicCmd       = String(MQTT_BASE_TOPIC) + "/" + DEVICE_ID + "/cmd";
-String topicStatus    = String(MQTT_BASE_TOPIC) + "/" + DEVICE_ID + "/status";
+static const char *DEVICE_TOPIC = "botarena/telemetry/" DEVICE_ID;
 
-unsigned long lastPubMs = 0;
-const unsigned long pubIntervalMs = 5000;
-
-void publishStatus(bool online) {
-  StaticJsonDocument<128> doc;
-  doc["online"] = online;
-  char buf[128];
-  size_t n = serializeJson(doc, buf, sizeof(buf));
-  // Usa la sobrecarga con const char* + retained
-  mqtt.publish(topicStatus.c_str(), buf, true);
-}
-
-void handleCommand(char* topic, byte* payload, unsigned int length) {
-  Serial.printf("[CMD] %s -> ", topic);
-  for (unsigned int i = 0; i < length; i++) Serial.print((char)payload[i]);
-  Serial.println();
-  // TODO: parse JSON si quieres
-}
-
-void mqttCallback(char* topic, byte* payload, unsigned int length) {
-  handleCommand(topic, payload, length);
-}
-
-void ensureWifi() {
-  if (WiFi.status() == WL_CONNECTED) return;
-
-  Serial.printf("WiFi connecting to %s ...\n", WIFI_SSID);
+void connectWiFi()
+{
   WiFi.mode(WIFI_STA);
   WiFi.begin(WIFI_SSID, WIFI_PASS);
-
-  uint8_t retries = 0;
-  while (WiFi.status() != WL_CONNECTED && retries++ < 50) {
-    delay(200);
+  Serial.print("WiFi connecting");
+  while (WiFi.status() != WL_CONNECTED)
+  {
+    delay(500);
     Serial.print(".");
   }
   Serial.println();
-
-  if (WiFi.status() == WL_CONNECTED) {
-    Serial.printf("WiFi connected: %s RSSI=%d IP=%s\n",
-                  WIFI_SSID, WiFi.RSSI(), WiFi.localIP().toString().c_str());
-  } else {
-    Serial.println("WiFi FAILED");
-  }
+  Serial.print("WiFi connected. IP: ");
+  Serial.println(WiFi.localIP());
 }
 
-void ensureMqtt() {
-  if (mqtt.connected()) return;
+void connectMQTT()
+{
+  mqtt.setServer(MQTT_HOST, MQTT_PORT);
+  // mqtt.setCallback(...) si necesitas suscripción
 
-  mqtt.setServer(MQTT_HOST, MQTT_PORT_CONST);
-  mqtt.setCallback(mqttCallback);
-
-  // Construir LWT en JSON
-  StaticJsonDocument<64> lwt;
-  lwt["online"] = false;
-  char lwtBuf[64];
-  serializeJson(lwt, lwtBuf, sizeof(lwtBuf));
-
-  String clientId = String("esp32-") + DEVICE_ID + "-" + String((uint32_t)ESP.getEfuseMac(), HEX);
-  Serial.printf("MQTT connecting to %s:%d as %s ...\n", MQTT_HOST, MQTT_PORT_CONST, clientId.c_str());
-
-  // LWT via connect(... willTopic, willQos, willRetain, willMessage)
-  // Overload: connect(clientID, user, pass, willTopic, willQos, willRetain, willMessage, cleanSession)
-  bool ok = mqtt.connect(
-      clientId.c_str(),
-      MQTT_USER, MQTT_PASS,
-      topicStatus.c_str(), 1, true, lwtBuf,
-      true
-  );
-
-  if (ok) {
-    Serial.println("MQTT connected");
-    publishStatus(true);
-    mqtt.subscribe(topicCmd.c_str(), 1);
-  } else {
-    Serial.printf("MQTT connect failed, rc=%d\n", mqtt.state());
+  Serial.print("MQTT connecting");
+  while (!mqtt.connected())
+  {
+    if (mqtt.connect(DEVICE_ID, MQTT_USER, MQTT_PASS))
+    {
+      Serial.println();
+      Serial.println("MQTT connected");
+      break;
+    }
+    else
+    {
+      Serial.print(".");
+      delay(1000);
+    }
   }
 }
 
 void publishTelemetry() {
-  timeClient.update();
-  unsigned long ts = timeClient.getEpochTime();
-
-  StaticJsonDocument<256> doc;
-  doc["ts"]   = (uint32_t)ts;
-  doc["temp"] = 24.0 + (rand() % 10) / 10.0;
-  doc["hum"]  = 50.0 + (rand() % 15);
+  // JSON moderno (ArduinoJson 7+)
+  JsonDocument doc;
+  doc["device"] = DEVICE_ID;
+  doc["ip"] = WiFi.localIP().toString();
   doc["rssi"] = WiFi.RSSI();
+  doc["heap"] = ESP.getFreeHeap();
+  doc["millis"] = (uint32_t)millis();
 
+  // Serializa a buffer
   char buf[256];
-  size_t n = serializeJson(doc, buf, sizeof(buf));
+  size_t len = serializeJson(doc, buf, sizeof(buf));
 
-  // Usa publish(topic, payload, retained) con char*
-  bool ok = mqtt.publish(topicTelemetry.c_str(), buf, true);
-  Serial.printf("PUB %s (%s) -> %.*s\n",
-                topicTelemetry.c_str(), ok ? "OK" : "FAIL", (int)n, buf);
+  if (len > 0)
+  {
+    // Usa la sobrecarga publish(const char* topic, const char* payload)
+    bool ok = mqtt.publish(DEVICE_TOPIC, buf);
+    Serial.print("publish(");
+    Serial.print(DEVICE_TOPIC);
+    Serial.print(") -> ");
+    Serial.println(ok ? "OK" : "FAIL");
+  }
+  else
+  {
+    Serial.println("serializeJson failed");
+  }
 }
+
+unsigned long lastPub = 0;
 
 void setup() {
   Serial.begin(115200);
-  delay(200);
-  ensureWifi();
-  timeClient.begin();
+  delay(500);
+  Serial.println();
+  Serial.println("Booting...");
+
+  connectWiFi();
+  connectMQTT();
 }
 
 void loop() {
-  ensureWifi();
-  ensureMqtt();
+  if (WiFi.status() != WL_CONNECTED)
+  {
+    connectWiFi();
+  }
+  if (!mqtt.connected())
+  {
+    connectMQTT();
+  }
   mqtt.loop();
 
   unsigned long now = millis();
-  if (mqtt.connected() && now - lastPubMs >= pubIntervalMs) {
-    lastPubMs = now;
+  if (now - lastPub > 5000)
+  {
+    lastPub = now;
     publishTelemetry();
   }
-
-  delay(10);
 }

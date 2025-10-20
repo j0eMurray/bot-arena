@@ -1,136 +1,138 @@
-/* eslint-disable @typescript-eslint/no-unused-vars */
-import Fastify, { FastifyInstance, FastifyRequest } from "fastify";
-import websocket from "@fastify/websocket";
-import cors from "@fastify/cors";
+// platform/services/api/src/index.ts
+// Fastify HTTP + WS con endpoints base + /telemetry (consulta reciente)
 
-// ===== Config =====
-const PORT = Number(process.env.PORT ?? 3000);
-const HOST = process.env.HOST ?? "0.0.0.0";
+import Fastify from "fastify";
+import fastifyCors from "@fastify/cors";
+import { WebSocketServer, WebSocket } from "ws";
+import { Client } from "pg";
 
-// ===== App =====
-const app: FastifyInstance = Fastify({
-  logger: true,
+const {
+  FASTIFY_ADDRESS = "0.0.0.0",
+  PORT = "3000",
+  DATABASE_URL = "postgres://postgres:postgres@db:5432/iot",
+  LOG_LEVEL = "info",
+} = process.env;
+
+const app = Fastify({
+  logger: LOG_LEVEL === "debug" ? { level: "debug" } : false,
 });
 
-// CORS abierto para desarrollo en LAN
-await app.register(cors, {
-  origin: true,
-  credentials: false,
-});
+app.register(fastifyCors, { origin: true });
 
-// WebSocket plugin
-await app.register(websocket);
+const pg = new Client({ connectionString: DATABASE_URL });
 
-// ===== Rutas HTTP básicas =====
-app.get("/", async () => {
-  return { ok: true, service: "api" };
-});
+const clamp = (n: number, min: number, max: number) =>
+  Math.max(min, Math.min(max, n));
+
+// --- HTTP base ---
+app.get("/", async () => ({ ok: true, service: "api" }));
 
 app.get("/health", async () => {
-  return { ok: true, status: "healthy" };
-});
-
-// (Opcional) evitar 404 de favicon en dev
-app.get("/favicon.ico", async (_req, reply) => {
-  reply.code(204).send();
-});
-
-// ===== Utilidades WS (sin any) =====
-type WSOn = {
-  (event: "close", cb: (code: number, reason: unknown) => void): void;
-  (event: "error", cb: (err: unknown) => void): void;
-  (event: "message", cb: (data: unknown, isBinary?: boolean) => void): void;
-};
-type WSLike = {
-  readyState: number;
-  send: (data: string | ArrayBufferLike | ArrayBufferView) => void;
-  on: WSOn;
-};
-const WS_OPEN = 1 as const;
-
-function isWS(obj: unknown): obj is WSLike {
-  return (
-    !!obj &&
-    typeof obj === "object" &&
-    typeof (obj as WSLike).on === "function" &&
-    typeof (obj as WSLike).send === "function" &&
-    typeof (obj as WSLike).readyState === "number"
-  );
-}
-
-/**
- * Los handlers de @fastify/websocket pueden recibir:
- *  - v10: el WebSocket directo
- *  - v9/v10: un SocketStream con { socket: WebSocket }
- */
-function pickSocket(connection: unknown): WSLike | null {
-  if (isWS(connection)) return connection;
-  if (connection && typeof connection === "object" && "socket" in connection) {
-    const s = (connection as { socket?: unknown }).socket;
-    if (isWS(s)) return s;
-  }
-  return null;
-}
-
-function safeSend(ws: WSLike | null, data: string) {
   try {
-    if (ws && ws.readyState === WS_OPEN) ws.send(data);
-  } catch {
-    // noop
+    await pg.query("SELECT 1");
+    return { ok: true, db: "up" };
+  } catch (e: unknown) {
+    const message = e instanceof Error ? e.message : String(e);
+    return { ok: false, db: "down", error: message };
+  }
+});
+
+// --- Telemetry: recientes ---
+app.get<{
+  Querystring: { limit?: string; offset?: string; device_id?: string };
+}>("/telemetry", async (req) => {
+  const rawLimit = Number(req.query.limit);
+  const limit = Number.isFinite(rawLimit) ? clamp(rawLimit, 1, 500) : 50;
+
+  const rawOffset = Number(req.query.offset);
+  const offset = Number.isFinite(rawOffset) ? Math.max(0, Math.floor(rawOffset)) : 0;
+
+  const deviceId = req.query.device_id;
+
+  const params: string[] = [];
+  let where = "";
+  if (deviceId) {
+    where = "WHERE device_id = $1";
+    params.push(deviceId);
+  }
+
+  const sql = `
+    SELECT id::text AS id, ts, device_id, topic, payload
+    FROM telemetry
+    ${where}
+    ORDER BY ts DESC
+    LIMIT ${limit}
+    OFFSET ${offset}
+  `;
+  const res = await pg.query(sql, params);
+  return { ok: true, count: res.rowCount, data: res.rows };
+});
+
+// --- WS demo /ws y /ws-test (latidos) ---
+const server = app.server;
+const wss = new WebSocketServer({ noServer: true });
+const wssTest = new WebSocketServer({ noServer: true });
+
+let tickTimer: NodeJS.Timeout | null = null;
+function startTicks(): void {
+  if (tickTimer) return;
+  tickTimer = setInterval(() => {
+    if (wss.clients.size === 0) return;
+    const msg = JSON.stringify({ t: Date.now(), type: "tick" });
+    wss.clients.forEach((c: WebSocket) => {
+      if (c.readyState === WebSocket.OPEN) c.send(msg);
+    });
+  }, 2000);
+}
+
+function maybeStopTicks(): void {
+  if (wss.clients.size === 0 && tickTimer) {
+    clearInterval(tickTimer);
+    tickTimer = null;
   }
 }
 
-// ===== Handlers WS =====
+server.on("upgrade", (request, socket, head) => {
+  const url = request.url || "/";
+  const pathname = new URL(url, "http://localhost").pathname;
 
-// /ws-test → heartbeat cada 1s (sin DB)
-app.get(
-  "/ws-test",
-  { websocket: true },
-  (connection: unknown, _req: FastifyRequest) => {
-    const socket = pickSocket(connection);
-    if (!socket) return; // si no hubo upgrade, salgo sin romper
+  if (pathname === "/ws") {
+    wss.handleUpgrade(request, socket, head, (ws) => {
+      wss.emit("connection", ws, request);
+    });
+  } else if (pathname === "/ws-test") {
+    wssTest.handleUpgrade(request, socket, head, (ws) => {
+      wssTest.emit("connection", ws, request);
+    });
+  } else {
+    socket.destroy();
+  }
+});
 
-    const timer = setInterval(() => {
-      safeSend(
-        socket,
-        JSON.stringify({ kind: "heartbeat", t: Date.now() }),
-      );
-    }, 1000);
+wss.on("connection", (ws: WebSocket) => {
+  ws.send(JSON.stringify({ hello: "welcome", service: "api", at: Date.now() }));
+  startTicks();
+  ws.on("close", maybeStopTicks);
+  ws.on("error", maybeStopTicks);
+});
 
-    socket.on("close", () => clearInterval(timer));
-    socket.on("error", () => clearInterval(timer));
-  },
-);
-
-// /ws → tick “demo” cada 2s (sin DB por ahora)
-app.get("/ws", { websocket: true }, (connection: unknown, _req: FastifyRequest) => {
-  const socket = pickSocket(connection);
-  if (!socket) return;
-
-  safeSend(socket, JSON.stringify({ kind: "welcome", msg: "ws connected" }));
-
+wssTest.on("connection", (ws: WebSocket) => {
   const timer = setInterval(() => {
-    const payload = {
-      kind: "tick",
-      now: new Date().toISOString(),
-      note: "demo stream",
-    };
-    safeSend(socket, JSON.stringify(payload));
-  }, 2000);
-
-  socket.on("close", () => clearInterval(timer));
-  socket.on("error", () => clearInterval(timer));
+    if (ws.readyState === WebSocket.OPEN) ws.send(`heartbeat ${Date.now()}`);
+  }, 1000);
+  const cleanup = () => clearInterval(timer);
+  ws.on("close", cleanup);
+  ws.on("error", cleanup);
 });
 
-// ===== Start =====
-app.ready().then(() => {
-  app.log.info(`API routes ready`);
-});
-
-try {
-  await app.listen({ host: HOST, port: PORT });
-  app.log.info(`API on :${PORT}`);
-} catch (err) {
-  app.log.error(err);
-  process.exit(1);
+// --- start ---
+async function start(): Promise<void> {
+  await pg.connect();
+  await app.listen({ host: FASTIFY_ADDRESS, port: parseInt(PORT, 10) });
+  console.log(`[api] listening on ${FASTIFY_ADDRESS}:${PORT}`);
 }
+start().catch((e: unknown) => {
+  const message = e instanceof Error ? e.message : String(e);
+  console.error("api failed:", message);
+  process.exit(1);
+});
